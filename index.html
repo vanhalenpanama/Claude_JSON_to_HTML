@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude JSON to HTML</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .json-container {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .json-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #fafafa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .json-key {
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+        }
+        .json-value {
+            margin-left: 10px;
+            color: #333;
+        }
+        pre {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+            white-space: pre-wrap; /* Wrap long lines */
+        }
+        .accordion-content {
+            display: none;
+            margin-left: 20px;
+            margin-top: 10px;
+            color: #333;
+        }
+        .accordion-content.show {
+            display: block;
+        }
+        .accordion-item {
+            margin-bottom: 90px;
+        }
+        #controls {
+            margin-bottom: 20px;
+        }
+        #downloadLink {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Claude JSON to HTML</h1>
+    <div id="controls">
+        <input type="file" id="fileInput" accept=".json">
+        <a id="downloadLink" download="json_viewer.html">HTML download</a>
+    </div>
+    <div class="json-container" id="jsonContainer" style="display: none"></div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/json') {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const jsonData = JSON.parse(e.target.result);
+                        const container = document.getElementById('jsonContainer');
+                        container.innerHTML = processJson(jsonData);
+                        // Create and display download link
+                        const htmlContent = `
+                            <!DOCTYPE html>
+                            <html lang="en">
+                            <head>
+                                <meta charset="UTF-8">
+                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                <title>Claude JSON to HTML</title>
+                                <style>
+                                    body {
+                                        font-family: Arial, sans-serif;
+                                        margin: 20px;
+                                        background-color: #f4f4f4;
+                                    }
+                                    .json-container {
+                                        background: #fff;
+                                        padding: 20px;
+                                        border-radius: 8px;
+                                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                                    }
+                                    .json-item {
+                                        margin-bottom: 10px;
+                                        padding: 10px;
+                                        background-color: #fafafa;
+                                        border: 1px solid #ddd;
+                                        border-radius: 4px;
+                                    }
+                                    .json-key {
+                                        font-weight: bold;
+                                        color: #333;
+                                        cursor: pointer;
+                                    }
+                                    .json-value {
+                                        margin-left: 10px;
+                                        color: #333;
+                                    }
+                                    pre {
+                                        background-color: #f0f0f0;
+                                        padding: 10px;
+                                        border-radius: 4px;
+                                        overflow-x: auto;
+                                        border: 1px solid #ddd;
+                                        white-space: pre-wrap;
+                                    }
+                                    .accordion-content {
+                                        display: none;
+                                        margin-left: 20px;
+                                        margin-top: 10px;
+                                        color: #333;
+                                    }
+                                    .accordion-content.show {
+                                        display: block;
+                                    }
+                                    .accordion-item {
+                                        margin-bottom: 90px;
+                                    }
+                                </style>
+                            </head>
+                            <body>
+                                <h1>Claude JSON to HTML</h1>
+                                <div class="json-container">
+                                    ${container.innerHTML}
+                                </div>
+                            </body>
+                            </html>
+                        `;
+                        const downloadLink = document.getElementById('downloadLink');
+                        const blob = new Blob([htmlContent], { type: 'text/html' });
+                        const url = URL.createObjectURL(blob);
+                        downloadLink.href = url;
+                        downloadLink.style.display = 'inline';
+                        downloadLink.textContent = 'HTML download';
+                    } catch (err) {
+                        alert('Failed to parse JSON.');
+                    }
+                };
+                reader.readAsText(file);
+            } else {
+                alert('Please upload a valid JSON file.');
+            }
+        });
+
+        function processJson(data, indent = 0) {
+    let html = '';
+    if (typeof data === 'object') {
+        if (Array.isArray(data)) {
+            data.forEach(item => {
+                html += processJson(item, indent);
+            });
+        } else {
+            for (const key in data) {
+                if (key === 'chat_messages' && Array.isArray(data[key])) {
+                    html += `<div class="json-item accordion-item" style="margin-left: ${indent * 20}px;">
+                             <span class="json-key" onclick="(function(e) {
+                                 const content = e.target.nextElementSibling;
+                                 content.classList.toggle('show');
+                             })(event)">${key}:</span>
+                             <div class="accordion-content">`;
+                    html += processJson(data[key], indent + 1);
+                    html += '</div></div>';
+                } else {
+                    html += `<div class="json-item" style="margin-left: ${indent * 20}px;">
+                             <span class="json-key">${key}:</span>`;
+                    const value = data[key];
+                    if (key === 'text' && typeof value === 'string') {
+                        if (value.trim().startsWith('```') && value.trim().endsWith('```')) {
+                            const codeContent = value.trim().slice(3, -3).trim();
+                            html += `<pre>${escapeHtml(codeContent)}</pre>`;
+                        } else {
+                            html += `<pre>${escapeHtml(value)}</pre>`;
+                        }
+                    } else if (typeof value === 'object') {
+                        html += '<br>' + processJson(value, indent + 1);
+                    } else {
+                        html += `<span class="json-value">${value}</span>`;
+                    }
+                    html += '</div>';
+                }
+            }
+        }
+    } else {
+        html += `<span class="json-value">${data}</span>`;
+    }
+    return html;
+}
+
+
+        function toggleAccordion(element) {
+            const content = element.nextElementSibling;
+            content.classList.toggle('show');
+        }
+
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>
